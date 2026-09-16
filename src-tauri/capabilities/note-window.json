@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "note-window",
+  "description": "Capability for floating note windows",
+  "windows": ["note-*"],
+  "permissions": ["core:default", "core:window:allow-close", "core:window:allow-destroy"]
+}
