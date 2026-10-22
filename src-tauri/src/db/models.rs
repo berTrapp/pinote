@@ -27,6 +27,10 @@ pub struct Note {
     pub archived_at: Option<String>,
     pub deleted_at: Option<String>,
     pub background_color: Option<String>,
+    pub opacity: f64,
+    pub font_size: Option<i64>,
+    pub always_on_top: bool,
+    pub remind_at: Option<String>,
     pub tags: Vec<Tag>,
 }
 
@@ -117,6 +121,10 @@ mod tests {
             archived_at: None,
             deleted_at: None,
             background_color: None,
+            opacity: 1.0,
+            font_size: None,
+            always_on_top: true,
+            remind_at: None,
             tags: Vec::new(),
         }
     }

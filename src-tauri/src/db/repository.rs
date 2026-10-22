@@ -34,6 +34,10 @@ fn row_to_note(row: &Row) -> rusqlite::Result<Note> {
         archived_at,
         deleted_at,
         background_color: row.get("background_color")?,
+        opacity: row.get::<_, Option<f64>>("opacity")?.unwrap_or(1.0),
+        font_size: row.get("font_size")?,
+        always_on_top: row.get::<_, Option<i64>>("always_on_top")?.unwrap_or(1) != 0,
+        remind_at: row.get("remind_at")?,
         tags: Vec::new(),
     })
 }
@@ -57,8 +61,10 @@ fn load_tags_for_note(conn: &Connection, note_id: &str) -> AppResult<Vec<Tag>> {
 }
 
 const NOTE_SELECT: &str = "n.id, n.title, n.content, n.favorite, n.priority, n.created_at, \
-     n.updated_at, n.archived_at, n.deleted_at, a.background_color";
-const NOTE_FROM: &str = "FROM notes n LEFT JOIN note_appearance a ON a.note_id = n.id";
+     n.updated_at, n.archived_at, n.deleted_at, n.remind_at, a.background_color, a.opacity, \
+     a.font_size, w.always_on_top";
+const NOTE_FROM: &str = "FROM notes n LEFT JOIN note_appearance a ON a.note_id = n.id \
+     LEFT JOIN note_window_state w ON w.note_id = n.id";
 
 pub fn create_note(conn: &Connection, title: Option<String>, content: Option<String>) -> AppResult<Note> {
     let id = Uuid::new_v4().to_string();
@@ -70,7 +76,7 @@ pub fn create_note(conn: &Connection, title: Option<String>, content: Option<Str
         params![id, title, content, ts],
     )?;
     conn.execute(
-        "INSERT INTO note_window_state (note_id) VALUES (?1)",
+        "INSERT INTO note_window_state (note_id, always_on_top) VALUES (?1, 1)",
         params![id],
     )?;
     conn.execute(
@@ -267,12 +273,13 @@ pub fn duplicate_note(conn: &Connection, id: &str) -> AppResult<Note> {
         params![new_id, new_title, original.content, original.priority, ts],
     )?;
     conn.execute(
-        "INSERT INTO note_window_state (note_id) VALUES (?1)",
-        params![new_id],
+        "INSERT INTO note_window_state (note_id, always_on_top) VALUES (?1, ?2)",
+        params![new_id, original.always_on_top as i64],
     )?;
     conn.execute(
-        "INSERT INTO note_appearance (note_id, background_color) VALUES (?1, ?2)",
-        params![new_id, original.background_color],
+        "INSERT INTO note_appearance (note_id, background_color, opacity, font_size)
+         VALUES (?1, ?2, ?3, ?4)",
+        params![new_id, original.background_color, original.opacity, original.font_size],
     )?;
     for tag in &original.tags {
         conn.execute(
@@ -291,6 +298,80 @@ pub fn set_background_color(conn: &Connection, id: &str, color: Option<&str>) ->
     )?;
     conn.execute("UPDATE notes SET updated_at = ?1 WHERE id = ?2", params![ts, id])?;
     get_note(conn, id)?.ok_or(AppError::NotFound)
+}
+
+pub fn set_appearance(
+    conn: &Connection,
+    id: &str,
+    opacity: f64,
+    font_size: Option<i64>,
+) -> AppResult<Note> {
+    let affected = conn.execute(
+        "UPDATE note_appearance SET opacity = ?1, font_size = ?2 WHERE note_id = ?3",
+        params![opacity, font_size, id],
+    )?;
+    if affected == 0 {
+        return Err(AppError::NotFound);
+    }
+    get_note(conn, id)?.ok_or(AppError::NotFound)
+}
+
+pub fn set_always_on_top(conn: &Connection, id: &str, always_on_top: bool) -> AppResult<Note> {
+    let affected = conn.execute(
+        "UPDATE note_window_state SET always_on_top = ?1 WHERE note_id = ?2",
+        params![always_on_top as i64, id],
+    )?;
+    if affected == 0 {
+        return Err(AppError::NotFound);
+    }
+    get_note(conn, id)?.ok_or(AppError::NotFound)
+}
+
+pub fn set_reminder(conn: &Connection, id: &str, remind_at: Option<&str>) -> AppResult<Note> {
+    let ts = now();
+    let affected = conn.execute(
+        "UPDATE notes SET remind_at = ?1, updated_at = ?2 WHERE id = ?3",
+        params![remind_at, ts, id],
+    )?;
+    if affected == 0 {
+        return Err(AppError::NotFound);
+    }
+    get_note(conn, id)?.ok_or(AppError::NotFound)
+}
+
+/// Clears and returns every reminder that is due at `now` — each fires exactly once.
+pub fn take_due_reminders(conn: &Connection, now: &str) -> AppResult<Vec<Note>> {
+    let ids = {
+        let mut stmt = conn.prepare(
+            "SELECT id FROM notes
+             WHERE remind_at IS NOT NULL AND remind_at <= ?1 AND deleted_at IS NULL",
+        )?;
+        let ids = stmt
+            .query_map(params![now], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        ids
+    };
+    let mut notes = Vec::with_capacity(ids.len());
+    for id in ids {
+        conn.execute("UPDATE notes SET remind_at = NULL WHERE id = ?1", params![id])?;
+        if let Some(note) = get_note(conn, &id)? {
+            notes.push(note);
+        }
+    }
+    Ok(notes)
+}
+
+/// Permanently deletes every trashed note, returning the ids that were removed.
+pub fn empty_trash(conn: &Connection) -> AppResult<Vec<String>> {
+    let ids = {
+        let mut stmt = conn.prepare("SELECT id FROM notes WHERE deleted_at IS NOT NULL")?;
+        let ids = stmt
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        ids
+    };
+    conn.execute("DELETE FROM notes WHERE deleted_at IS NOT NULL", [])?;
+    Ok(ids)
 }
 
 fn row_to_window_state(row: &Row) -> rusqlite::Result<NoteWindowState> {

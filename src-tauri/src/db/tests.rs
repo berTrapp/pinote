@@ -1,5 +1,4 @@
 use rusqlite::Connection;
-use rusqlite_migration::{Migrations, M};
 
 use super::models::{NoteQuery, NoteStatus, SortBy, SortDir, StatusFilter};
 use super::repository;
@@ -7,8 +6,7 @@ use super::repository;
 fn test_conn() -> Connection {
     let mut conn = Connection::open_in_memory().unwrap();
     conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
-    let migrations = Migrations::new(vec![M::up(include_str!("migrations/0001_init.sql"))]);
-    migrations.to_latest(&mut conn).unwrap();
+    super::migrations().to_latest(&mut conn).unwrap();
     conn
 }
 
@@ -268,7 +266,7 @@ fn new_note_has_default_window_state() {
     let window_state = repository::get_window_state(&conn, &note.id).unwrap().unwrap();
     assert_eq!(window_state.note_id, note.id);
     assert!(window_state.x.is_none());
-    assert!(!window_state.always_on_top);
+    assert!(window_state.always_on_top);
     assert!(!window_state.visible);
 }
 
@@ -324,4 +322,64 @@ fn remove_tag_from_note_deletes_association_only() {
     assert!(after_remove.tags.is_empty());
     let tags = repository::list_tags(&conn).unwrap();
     assert_eq!(tags.len(), 1);
+}
+
+#[test]
+fn new_notes_start_pinned_and_can_be_unpinned() {
+    let conn = test_conn();
+    let note = repository::create_note(&conn, None, None).unwrap();
+    assert!(note.always_on_top);
+    let updated = repository::set_always_on_top(&conn, &note.id, false).unwrap();
+    assert!(!updated.always_on_top);
+}
+
+#[test]
+fn set_appearance_updates_opacity_and_font_size() {
+    let conn = test_conn();
+    let note = repository::create_note(&conn, None, None).unwrap();
+    assert_eq!(note.opacity, 1.0);
+    let updated = repository::set_appearance(&conn, &note.id, 0.7, Some(18)).unwrap();
+    assert_eq!(updated.opacity, 0.7);
+    assert_eq!(updated.font_size, Some(18));
+}
+
+#[test]
+fn take_due_reminders_returns_only_due_ones_and_clears_them() {
+    let conn = test_conn();
+    let due = repository::create_note(&conn, Some("Due".into()), None).unwrap();
+    let later = repository::create_note(&conn, Some("Later".into()), None).unwrap();
+    repository::set_reminder(&conn, &due.id, Some("2026-01-01T10:00:00Z")).unwrap();
+    repository::set_reminder(&conn, &later.id, Some("2026-01-01T12:00:00Z")).unwrap();
+
+    let fired = repository::take_due_reminders(&conn, "2026-01-01T11:00:00Z").unwrap();
+
+    assert_eq!(fired.len(), 1);
+    assert_eq!(fired[0].id, due.id);
+    assert!(fired[0].remind_at.is_none());
+    assert!(repository::take_due_reminders(&conn, "2026-01-01T11:00:00Z").unwrap().is_empty());
+    let later = repository::get_note(&conn, &later.id).unwrap().unwrap();
+    assert_eq!(later.remind_at.as_deref(), Some("2026-01-01T12:00:00Z"));
+}
+
+#[test]
+fn take_due_reminders_skips_trashed_notes() {
+    let conn = test_conn();
+    let note = repository::create_note(&conn, Some("x".into()), None).unwrap();
+    repository::set_reminder(&conn, &note.id, Some("2026-01-01T10:00:00Z")).unwrap();
+    repository::soft_delete_note(&conn, &note.id).unwrap();
+    assert!(repository::take_due_reminders(&conn, "2026-01-02T00:00:00Z").unwrap().is_empty());
+}
+
+#[test]
+fn empty_trash_deletes_only_trashed_notes() {
+    let conn = test_conn();
+    let kept = repository::create_note(&conn, Some("keep".into()), None).unwrap();
+    let trashed = repository::create_note(&conn, Some("trash".into()), None).unwrap();
+    repository::soft_delete_note(&conn, &trashed.id).unwrap();
+
+    let removed = repository::empty_trash(&conn).unwrap();
+
+    assert_eq!(removed, vec![trashed.id.clone()]);
+    assert!(repository::get_note(&conn, &trashed.id).unwrap().is_none());
+    assert!(repository::get_note(&conn, &kept.id).unwrap().is_some());
 }
