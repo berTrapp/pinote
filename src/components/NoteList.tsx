@@ -1,11 +1,18 @@
+import { useEffect, useState } from "react";
 import type { MouseEvent } from "react";
 import { useNotesStore } from "../stores/notesStore";
 import { windowsApi } from "../services/windowsApi";
 import type { Note } from "../types";
+import { checklistProgress, parseChecklistLine } from "../lib/checklist";
+import { priorityInfo } from "../lib/priority";
+import { formatReminder } from "../lib/reminder";
 
 function preview(content: string): string {
   const firstLine = content.split("\n").find((line) => line.trim().length > 0);
-  return firstLine?.slice(0, 120) ?? "";
+  if (!firstLine) return "";
+  const item = parseChecklistLine(firstLine);
+  const text = item ? `${item.checked ? "☑" : "☐"} ${item.text}` : firstLine;
+  return text.slice(0, 120);
 }
 
 function formatDate(iso: string): string {
@@ -23,6 +30,7 @@ export function NoteList() {
   const toggleSelectAll = useNotesStore((s) => s.toggleSelectAll);
   const clearBulkSelection = useNotesStore((s) => s.clearBulkSelection);
   const bulkDeleteSelected = useNotesStore((s) => s.bulkDeleteSelected);
+  const statusFilter = useNotesStore((s) => s.statusFilter);
 
   const allSelected = notes.length > 0 && notes.every((n) => selectedIds.has(n.id));
 
@@ -66,6 +74,7 @@ export function NoteList() {
           </button>
         </div>
       )}
+      {statusFilter === "trashed" && <EmptyTrashBar count={notes.length} />}
       <ul className="flex flex-1 flex-col overflow-y-auto">
         {notes.map((note) => (
           <NoteRow
@@ -78,6 +87,39 @@ export function NoteList() {
           />
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** Two-step button: the first click arms it, the second (within a few seconds) empties the trash. */
+function EmptyTrashBar({ count }: { count: number }) {
+  const emptyTrash = useNotesStore((s) => s.emptyTrash);
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+
+  return (
+    <div className="flex items-center justify-between gap-2 border-b border-black/10 px-3 py-1.5 text-xs dark:border-white/10">
+      <span className="opacity-60">{count} nota(s) na lixeira</span>
+      <button
+        onClick={() => {
+          if (!armed) {
+            setArmed(true);
+            return;
+          }
+          setArmed(false);
+          void emptyTrash();
+        }}
+        className={`rounded-md px-2 py-0.5 font-medium transition-colors ${
+          armed ? "bg-red-600 text-white hover:bg-red-700" : "text-red-500 hover:bg-red-500/10"
+        }`}
+      >
+        {armed ? "Confirmar exclusão definitiva" : "Esvaziar lixeira"}
+      </button>
     </div>
   );
 }
@@ -104,6 +146,8 @@ function NoteRow({
 
   const isTrashed = note.status === "trashed";
   const isArchived = note.status === "archived";
+  const priority = priorityInfo(note.priority);
+  const progress = checklistProgress(note.content);
 
   const iconBtn = "opacity-0 transition-opacity group-hover:opacity-100";
   const iconBtnDanger = "opacity-0 text-red-500 transition-opacity group-hover:opacity-100";
@@ -136,6 +180,14 @@ function NoteRow({
                 className="h-2 w-2 shrink-0 rounded-full"
                 style={{ backgroundColor: note.background_color }}
               />
+            )}
+            {priority.mark && (
+              <span
+                className={`shrink-0 text-xs font-bold ${priority.className}`}
+                title={`Prioridade ${priority.label.toLowerCase()}`}
+              >
+                {priority.mark}
+              </span>
             )}
             <span className="truncate text-sm font-medium">{note.title || "Sem título"}</span>
           </span>
@@ -213,7 +265,22 @@ function NoteRow({
           </span>
         </div>
         <span className="truncate text-xs opacity-60">{preview(note.content) || "Nota vazia"}</span>
-        <span className="text-[11px] opacity-40">{formatDate(note.updated_at)}</span>
+        <span className="flex items-center gap-2 text-[11px]">
+          <span className="opacity-40">{formatDate(note.updated_at)}</span>
+          {progress.total > 0 && (
+            <span
+              className={progress.done === progress.total ? "text-green-600" : "opacity-50"}
+              title="Itens concluídos"
+            >
+              ☑ {progress.done}/{progress.total}
+            </span>
+          )}
+          {note.remind_at && (
+            <span className="text-blue-600 dark:text-blue-400" title="Lembrete">
+              ⏰ {formatReminder(note.remind_at)}
+            </span>
+          )}
+        </span>
       </button>
     </li>
   );

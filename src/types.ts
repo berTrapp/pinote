@@ -17,6 +17,10 @@ export interface Note {
   archived_at: string | null;
   deleted_at: string | null;
   background_color: string | null;
+  opacity: number;
+  font_size: number | null;
+  always_on_top: boolean;
+  remind_at: string | null;
   tags: Tag[];
 }
 

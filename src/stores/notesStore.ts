@@ -32,12 +32,15 @@ interface NotesState {
   saveNoteContent: (id: string, title: string | null, content: string) => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
   setNoteColor: (id: string, color: string | null) => Promise<void>;
+  setNotePriority: (id: string, priority: number) => Promise<void>;
+  setNoteReminder: (id: string, remindAt: string | null) => Promise<void>;
   archiveNote: (id: string) => Promise<void>;
   unarchiveNote: (id: string) => Promise<void>;
   softDeleteNote: (id: string) => Promise<void>;
   restoreNote: (id: string) => Promise<void>;
   deleteNotePermanently: (id: string) => Promise<void>;
   duplicateNote: (id: string) => Promise<void>;
+  emptyTrash: () => Promise<void>;
   createTag: (name: string) => Promise<Tag>;
   addTagToNote: (noteId: string, tagId: string) => Promise<void>;
   removeTagFromNote: (noteId: string, tagId: string) => Promise<void>;
@@ -176,6 +179,16 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     set((state) => ({ notes: replaceNote(state.notes, updated) }));
   },
 
+  setNotePriority: async (id, priority) => {
+    const updated = await notesApi.setPriority(id, priority);
+    set((state) => ({ notes: replaceNote(state.notes, updated) }));
+  },
+
+  setNoteReminder: async (id, remindAt) => {
+    const updated = await notesApi.setReminder(id, remindAt);
+    set((state) => ({ notes: replaceNote(state.notes, updated) }));
+  },
+
   archiveNote: async (id) => {
     await notesApi.archive(id);
     await get().loadNotes();
@@ -208,6 +221,12 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     const copy = await notesApi.duplicate(id);
     await get().loadNotes();
     set({ selectedNoteId: copy.id });
+  },
+
+  emptyTrash: async () => {
+    await notesApi.emptyTrash();
+    set({ selectedIds: new Set() });
+    await get().loadNotes();
   },
 
   createTag: async (name) => {

@@ -2,6 +2,7 @@
 
 :root {
   color-scheme: light dark;
+  --app-bg: light-dark(#f4f4f5, #18181b);
 }
 
 html,
@@ -16,9 +17,15 @@ body {
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Helvetica Neue", Arial,
     sans-serif;
   -webkit-font-smoothing: antialiased;
-  background-color: light-dark(#f4f4f5, #18181b);
+  background-color: var(--app-bg);
   color: light-dark(#18181b, #f4f4f5);
   user-select: none;
+}
+
+/* floating note windows are transparent; the note itself paints the background */
+html.note-window,
+html.note-window body {
+  background-color: transparent;
 }
 
 input,

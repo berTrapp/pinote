@@ -105,15 +105,21 @@ pub fn open_note_window<R: Runtime>(app: &AppHandle<R>, note_id: &str) -> AppRes
     let title = note.title.clone().unwrap_or_else(|| "Nota".to_string());
     let url = WebviewUrl::App(format!("index.html#/note/{note_id}").into());
 
-    // Floating notes are always pinned above other windows — that's the point of a sticky note.
     let mut builder = WebviewWindowBuilder::new(app, &label, url)
         .title(title)
         .inner_size(width, height)
         .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
-        .always_on_top(true)
+        .always_on_top(note.always_on_top)
         .resizable(true)
         .decorations(true)
         .visible(true);
+
+    // A transparent webview lets the note paint its own semi-transparent background
+    // when its opacity is lowered (macOS would need the private API feature for this).
+    #[cfg(not(target_os = "macos"))]
+    {
+        builder = builder.transparent(true);
+    }
 
     if let Some((x, y)) = saved_position {
         if position_is_on_some_monitor(app, x, y) {

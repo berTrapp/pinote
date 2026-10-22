@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useNotesStore } from "../stores/notesStore";
 import { windowsApi } from "../services/windowsApi";
+import { notesApi } from "../services/notesApi";
 import { NOTE_COLORS } from "../lib/noteColors";
+import { PRIORITIES } from "../lib/priority";
+import { NoteBody } from "./NoteBody";
+import { ReminderControl } from "./ReminderControl";
 
 export function NoteEditor() {
   const selectedNoteId = useNotesStore((s) => s.selectedNoteId);
@@ -12,6 +16,8 @@ export function NoteEditor() {
   const saveStatus = useNotesStore((s) => s.saveStatus);
   const toggleFavorite = useNotesStore((s) => s.toggleFavorite);
   const setNoteColor = useNotesStore((s) => s.setNoteColor);
+  const setNotePriority = useNotesStore((s) => s.setNotePriority);
+  const setNoteReminder = useNotesStore((s) => s.setNoteReminder);
   const archiveNote = useNotesStore((s) => s.archiveNote);
   const unarchiveNote = useNotesStore((s) => s.unarchiveNote);
   const softDeleteNote = useNotesStore((s) => s.softDeleteNote);
@@ -218,6 +224,25 @@ export function NoteEditor() {
             }`}
           />
         ))}
+
+        <select
+          value={note.priority}
+          onChange={(e) => void setNotePriority(note.id, Number(e.target.value))}
+          disabled={isTrashed}
+          title="Prioridade"
+          className="ml-auto rounded-md border border-black/10 bg-transparent px-1.5 py-0.5 text-xs outline-none disabled:opacity-40 dark:border-white/10"
+        >
+          {PRIORITIES.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.mark ? `${p.mark} ${p.label}` : p.label}
+            </option>
+          ))}
+        </select>
+        <ReminderControl
+          remindAt={note.remind_at}
+          onChange={(remindAt) => void setNoteReminder(note.id, remindAt)}
+          disabled={isTrashed}
+        />
       </div>
 
       <input
@@ -231,15 +256,17 @@ export function NoteEditor() {
         className="border-b border-black/10 bg-transparent px-4 py-3 text-lg font-medium outline-none disabled:opacity-60 dark:border-white/10"
       />
 
-      <textarea
+      <NoteBody
         value={content}
-        onChange={(e) => {
-          setContent(e.target.value);
-          scheduleSave(title, e.target.value);
+        onChange={(next) => {
+          setContent(next);
+          scheduleSave(title, next);
         }}
-        placeholder="Escreva em markdown..."
+        onExport={() => void flushSave().then(() => notesApi.exportMarkdown(note.id))}
         disabled={isTrashed}
-        className="flex-1 resize-none bg-transparent px-4 py-3 text-sm leading-relaxed outline-none disabled:opacity-60"
+        style={note.font_size ? { fontSize: note.font_size } : undefined}
+        toolbarClassName="px-3 pt-2"
+        className="flex-1 px-4 py-3 text-sm leading-relaxed"
       />
 
       <div className="flex flex-wrap items-center gap-1.5 border-t border-black/10 px-4 py-2 dark:border-white/10">

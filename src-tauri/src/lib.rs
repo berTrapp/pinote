@@ -2,6 +2,7 @@ mod commands;
 mod db;
 mod error;
 mod events;
+mod reminders;
 mod shortcuts;
 mod state;
 mod tray;
@@ -17,6 +18,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let data_dir = app
                 .path()
@@ -31,6 +34,7 @@ pub fn run() {
             if let Err(err) = shortcuts::register(app.handle()) {
                 log::warn!("failed to register global shortcut: {err}");
             }
+            reminders::start(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -40,6 +44,11 @@ pub fn run() {
             note_commands::update_note_content,
             note_commands::set_note_color,
             note_commands::set_note_priority,
+            note_commands::set_note_appearance,
+            note_commands::set_note_always_on_top,
+            note_commands::set_note_reminder,
+            note_commands::empty_trash,
+            note_commands::export_note,
             note_commands::toggle_note_favorite,
             note_commands::archive_note,
             note_commands::unarchive_note,

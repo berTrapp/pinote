@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { notesApi } from "../../services/notesApi";
-import type { Note, NoteUpdatedEvent } from "../../types";
+import { NoteBody } from "../../components/NoteBody";
+import type { Note, NoteDeletedEvent, NoteUpdatedEvent } from "../../types";
+
+const OPACITY_STEPS = [1, 0.85, 0.7, 0.55];
+const DEFAULT_FONT_SIZE = 14;
+const MIN_FONT_SIZE = 10;
+const MAX_FONT_SIZE = 32;
 
 export function NoteWindowView({ noteId }: { noteId: string }) {
   const [note, setNote] = useState<Note | null>(null);
@@ -22,6 +28,21 @@ export function NoteWindowView({ noteId }: { noteId: string }) {
     });
     return () => {
       cancelled = true;
+    };
+  }, [noteId]);
+
+  useEffect(() => {
+    // lets the note paint its own (possibly translucent) background over a transparent window
+    document.documentElement.classList.add("note-window");
+  }, []);
+
+  useEffect(() => {
+    // the note was removed for good (e.g. "Esvaziar lixeira") — nothing left to show
+    const unlisten = listen<NoteDeletedEvent>("note-deleted", (event) => {
+      if (event.payload.note_id === noteId) void getCurrentWindow().destroy();
+    });
+    return () => {
+      void unlisten.then((f) => f());
     };
   }, [noteId]);
 
@@ -89,6 +110,15 @@ export function NoteWindowView({ noteId }: { noteId: string }) {
     }, 600);
   }
 
+  async function updateAppearance(opacity: number, fontSize: number | null) {
+    setNote(await notesApi.setAppearance(noteId, opacity, fontSize));
+  }
+
+  async function toggleAlwaysOnTop() {
+    if (!note) return;
+    setNote(await notesApi.setAlwaysOnTop(noteId, !note.always_on_top));
+  }
+
   if (!note) {
     return (
       <div className="flex h-screen items-center justify-center text-sm opacity-40">
@@ -97,34 +127,76 @@ export function NoteWindowView({ noteId }: { noteId: string }) {
     );
   }
 
+  const fontSize = note.font_size ?? DEFAULT_FONT_SIZE;
+  const nextOpacity =
+    OPACITY_STEPS[(OPACITY_STEPS.indexOf(note.opacity) + 1) % OPACITY_STEPS.length] ?? 1;
+  const baseBackground = note.background_color ?? "var(--app-bg)";
+
+  const iconBtn =
+    "flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1 text-xs opacity-60 transition-colors hover:bg-black/5 hover:opacity-100 disabled:opacity-25 dark:hover:bg-white/10";
+
   return (
     <div
       className="flex h-screen flex-col"
-      style={
-        note.background_color
-          ? { backgroundColor: note.background_color, color: "#18181b" }
-          : undefined
-      }
+      style={{
+        backgroundColor: `color-mix(in srgb, ${baseBackground} ${Math.round(note.opacity * 100)}%, transparent)`,
+        color: note.background_color ? "#18181b" : undefined,
+      }}
     >
-      <input
-        value={title}
-        onChange={(e) => {
-          setTitle(e.target.value);
-          scheduleSave(e.target.value, content);
-        }}
-        placeholder="Título (opcional)"
-        className="border-b border-black/10 bg-transparent px-3 py-2 text-base font-medium outline-none dark:border-white/10"
-      />
+      <div className="flex items-center gap-0.5 border-b border-black/10 pr-1 dark:border-white/10">
+        <input
+          value={title}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            scheduleSave(e.target.value, content);
+          }}
+          placeholder="Título (opcional)"
+          className="min-w-0 flex-1 bg-transparent px-3 py-2 text-base font-medium outline-none"
+        />
+        <button
+          onClick={() => void toggleAlwaysOnTop()}
+          className={`${iconBtn} ${note.always_on_top ? "opacity-100" : "grayscale"}`}
+          title={note.always_on_top ? "Desafixar do topo" : "Fixar sempre no topo"}
+          aria-pressed={note.always_on_top}
+        >
+          📌
+        </button>
+        <button
+          onClick={() => void updateAppearance(note.opacity, fontSize - 1)}
+          disabled={fontSize <= MIN_FONT_SIZE}
+          className={iconBtn}
+          title="Diminuir fonte"
+        >
+          A−
+        </button>
+        <button
+          onClick={() => void updateAppearance(note.opacity, fontSize + 1)}
+          disabled={fontSize >= MAX_FONT_SIZE}
+          className={iconBtn}
+          title="Aumentar fonte"
+        >
+          A+
+        </button>
+        <button
+          onClick={() => void updateAppearance(nextOpacity, note.font_size)}
+          className={iconBtn}
+          title={`Opacidade: ${Math.round(note.opacity * 100)}% (clique para ${Math.round(nextOpacity * 100)}%)`}
+        >
+          ◐
+        </button>
+      </div>
 
-      <textarea
+      <NoteBody
         value={content}
-        onChange={(e) => {
-          setContent(e.target.value);
-          scheduleSave(title, e.target.value);
+        onChange={(next) => {
+          setContent(next);
+          scheduleSave(title, next);
         }}
-        placeholder="Escreva em markdown..."
-        className="flex-1 resize-none bg-transparent px-3 py-2 text-sm leading-relaxed outline-none"
+        onExport={() => void flushSave().then(() => notesApi.exportMarkdown(noteId))}
         autoFocus
+        style={{ fontSize }}
+        toolbarClassName="px-2 pt-1"
+        className="flex-1 px-3 py-2 leading-relaxed"
       />
     </div>
   );

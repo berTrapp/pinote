@@ -10,8 +10,11 @@ use rusqlite_migration::{Migrations, M};
 
 pub type Pool = r2d2::Pool<SqliteConnectionManager>;
 
-fn migrations() -> Migrations<'static> {
-    Migrations::new(vec![M::up(include_str!("migrations/0001_init.sql"))])
+pub(crate) fn migrations() -> Migrations<'static> {
+    Migrations::new(vec![
+        M::up(include_str!("migrations/0001_init.sql")),
+        M::up(include_str!("migrations/0002_reminders_and_pin.sql")),
+    ])
 }
 
 /// Opens (creating if needed) the SQLite database at `data_dir/pinote.sqlite3`,
