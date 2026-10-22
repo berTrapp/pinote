@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AlarmClock, AlarmClockOff, Check, X } from "lucide-react";
 import { formatReminder, isoToLocalInput, localInputToIso } from "../lib/reminder";
 
 export function ReminderControl({
@@ -14,7 +15,7 @@ export function ReminderControl({
   const [draft, setDraft] = useState("");
 
   const btn =
-    "flex items-center gap-1 rounded-md px-2 py-0.5 text-xs transition-colors hover:bg-black/5 disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-white/10";
+    "flex h-6 items-center gap-1.5 rounded-md px-2 text-xs transition-colors disabled:pointer-events-none disabled:opacity-40";
 
   if (editing) {
     return (
@@ -33,13 +34,23 @@ export function ReminderControl({
           min={isoToLocalInput(new Date().toISOString())}
           onChange={(e) => setDraft(e.target.value)}
           autoFocus
-          className="rounded border border-black/10 bg-transparent px-1 text-xs outline-none dark:border-white/10"
+          className="h-6 rounded-md border border-accent/50 bg-white/[0.04] px-1.5 font-mono text-[11px] text-fg outline-none [color-scheme:dark] focus:ring-2 focus:ring-accent/20"
         />
-        <button type="submit" disabled={!draft} className={`${btn} text-blue-600`}>
-          OK
+        <button
+          type="submit"
+          disabled={!draft}
+          aria-label="Salvar lembrete"
+          className={`${btn} px-1.5 text-emerald-400 hover:bg-emerald-400/10`}
+        >
+          <Check size={14} />
         </button>
-        <button type="button" onClick={() => setEditing(false)} className={`${btn} opacity-60`}>
-          ×
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          aria-label="Cancelar"
+          className={`${btn} px-1.5 text-faint hover:bg-white/5 hover:text-fg`}
+        >
+          <X size={14} />
         </button>
       </form>
     );
@@ -47,26 +58,27 @@ export function ReminderControl({
 
   if (remindAt) {
     return (
-      <span className="flex items-center gap-0.5 rounded-md bg-blue-600/10 text-xs text-blue-700 dark:text-blue-300">
+      <span className="flex items-center rounded-md border border-sky-400/25 bg-sky-400/10 text-sky-300">
         <button
           onClick={() => {
             setDraft(isoToLocalInput(remindAt));
             setEditing(true);
           }}
           disabled={disabled}
-          className={btn}
+          className={`${btn} font-mono text-[11px] hover:bg-sky-400/10`}
           title="Alterar lembrete"
         >
-          ⏰ {formatReminder(remindAt)}
+          <AlarmClock size={13} />
+          {formatReminder(remindAt)}
         </button>
         <button
           onClick={() => onChange(null)}
           disabled={disabled}
-          className="pr-1.5 opacity-60 hover:opacity-100"
+          className="grid h-6 w-6 place-items-center rounded-md text-sky-300/60 hover:bg-sky-400/10 hover:text-sky-200"
           aria-label="Remover lembrete"
           title="Remover lembrete"
         >
-          ×
+          <AlarmClockOff size={12} />
         </button>
       </span>
     );
@@ -79,10 +91,11 @@ export function ReminderControl({
         setEditing(true);
       }}
       disabled={disabled}
-      className={`${btn} opacity-60 hover:opacity-100`}
+      className={`${btn} border border-dashed border-line-strong text-faint hover:border-accent/50 hover:text-fg`}
       title="Lembrete: abre a nota e notifica na hora escolhida"
     >
-      ⏰ Lembrete
+      <AlarmClock size={13} />
+      Definir
     </button>
   );
 }

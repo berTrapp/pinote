@@ -7,11 +7,18 @@ const INLINE_RE = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*\s][^*]*\*|_[^_\s][^_]*_)/g;
 function renderInline(text: string): ReactNode[] {
   return text.split(INLINE_RE).map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
+      return (
+        <strong key={i} className="font-semibold text-fg">
+          {part.slice(2, -2)}
+        </strong>
+      );
     }
     if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
       return (
-        <code key={i} className="rounded bg-black/10 px-1 font-mono text-[0.9em] dark:bg-white/10">
+        <code
+          key={i}
+          className="rounded border border-line bg-white/[0.06] px-1 font-mono text-[0.85em] text-violet-300"
+        >
           {part.slice(1, -1)}
         </code>
       );
@@ -25,8 +32,8 @@ function renderInline(text: string): ReactNode[] {
 
 const HEADING_CLASS = [
   "",
-  "text-[1.4em] font-semibold",
-  "text-[1.2em] font-semibold",
+  "mt-2 text-[1.4em] font-semibold tracking-tight text-fg",
+  "mt-1.5 text-[1.2em] font-semibold tracking-tight text-fg",
   "font-semibold",
 ];
 
@@ -40,7 +47,7 @@ export function MarkdownPreview({
   onChange: (value: string) => void;
   disabled: boolean;
 }) {
-  if (!value.trim()) return <span className="opacity-40">Nota vazia</span>;
+  if (!value.trim()) return <span className="text-faint">Nota vazia</span>;
 
   return value.split("\n").map((line, i) => {
     const item = parseChecklistLine(line);
@@ -56,9 +63,11 @@ export function MarkdownPreview({
             checked={item.checked}
             disabled={disabled}
             onChange={() => onChange(toggleChecklistItem(value, i))}
-            className="mt-[0.3em] shrink-0 accent-blue-600"
+            className="mt-[0.35em] shrink-0 accent-violet-500"
           />
-          <span className={`whitespace-pre-wrap ${item.checked ? "line-through opacity-50" : ""}`}>
+          <span
+            className={`whitespace-pre-wrap ${item.checked ? "text-faint line-through decoration-faint" : ""}`}
+          >
             {item.text ? renderInline(item.text) : " "}
           </span>
         </label>
@@ -82,7 +91,7 @@ export function MarkdownPreview({
           className="flex gap-2 select-text"
           style={{ paddingLeft: `${bullet[1].length * 0.5}em` }}
         >
-          <span className="opacity-60">•</span>
+          <span className="text-accent">•</span>
           <span className="whitespace-pre-wrap">{renderInline(bullet[2])}</span>
         </div>
       );

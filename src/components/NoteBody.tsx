@@ -12,6 +12,21 @@ import {
 import { formatNow, insertText, toggleLinePrefix, toggleWrap } from "../lib/textEdits";
 import { copyToClipboard } from "../lib/clipboard";
 import { MarkdownPreview } from "./MarkdownPreview";
+import {
+  ArrowDownToLine,
+  Bold,
+  Check,
+  Clock,
+  Copy,
+  Download,
+  Eraser,
+  Eye,
+  Heading,
+  List,
+  ListChecks,
+  MoreHorizontal,
+  PencilLine,
+} from "lucide-react";
 
 /**
  * Note content editor. "Editar" shows the raw markdown textarea with a formatting toolbar;
@@ -23,6 +38,7 @@ export function NoteBody({
   onExport,
   disabled = false,
   autoFocus = false,
+  compact = false,
   className = "",
   toolbarClassName = "",
   style,
@@ -32,6 +48,8 @@ export function NoteBody({
   onExport?: () => void;
   disabled?: boolean;
   autoFocus?: boolean;
+  /** Narrow layout for floating windows: no progress bar, single edit/view toggle. */
+  compact?: boolean;
   className?: string;
   toolbarClassName?: string;
   style?: CSSProperties;
@@ -109,119 +127,163 @@ export function NoteBody({
 
   const progress = checklistProgress(value);
 
-  const btn =
-    "flex h-6 min-w-6 items-center justify-center gap-1 rounded-md px-1.5 text-xs opacity-60 transition-colors hover:bg-black/5 hover:opacity-100 disabled:pointer-events-none disabled:opacity-30 dark:hover:bg-white/10";
   const menuItem =
-    "w-full rounded px-2 py-1 text-left text-xs hover:bg-black/5 disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-white/10";
+    "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-xs text-fg/90 transition-colors hover:bg-white/[0.07] disabled:pointer-events-none disabled:opacity-35";
+  const modeBtn = (active: boolean) =>
+    `grid h-6 w-7 place-items-center rounded-md transition-colors ${
+      active ? "bg-white/10 text-fg shadow-sm" : "text-faint hover:text-muted"
+    }`;
 
   return (
     <>
-      <div className={`flex items-center gap-0.5 ${toolbarClassName}`}>
+      <div className={`flex shrink-0 items-center gap-0.5 ${toolbarClassName}`}>
         <button
           onClick={() => editAtSelection(toggleChecklistLines)}
           disabled={disabled}
-          className={btn}
+          className="icon-btn"
+          aria-label="Checklist"
           title="Checklist (Enter cria novo item, Ctrl+Enter marca/desmarca)"
         >
-          ☑
+          <ListChecks size={15} />
         </button>
         <button
           onClick={() => editAtSelection((c, s, e) => toggleWrap(c, s, e, "**"))}
           disabled={disabled}
-          className={`${btn} font-bold`}
+          className="icon-btn"
+          aria-label="Negrito"
           title="Negrito (Ctrl+B)"
         >
-          B
+          <Bold size={14} />
         </button>
         <button
           onClick={() => editAtSelection((c, s, e) => toggleLinePrefix(c, s, e, "# "))}
           disabled={disabled}
-          className={`${btn} font-semibold`}
+          className="icon-btn"
+          aria-label="Título"
           title="Título"
         >
-          H
+          <Heading size={14} />
         </button>
         <button
           onClick={() => editAtSelection((c, s, e) => toggleLinePrefix(c, s, e, "- "))}
           disabled={disabled}
-          className={btn}
+          className="icon-btn"
+          aria-label="Lista"
           title="Lista"
         >
-          •
+          <List size={15} />
         </button>
         <button
           onClick={() => editAtSelection((c, s, e) => insertText(c, s, e, formatNow()))}
           disabled={disabled}
-          className={btn}
+          className="icon-btn"
+          aria-label="Inserir data e hora"
           title="Inserir data e hora"
         >
-          🕒
+          <Clock size={14} />
         </button>
 
         {progress.total > 0 && (
           <span
-            className="ml-1 flex items-center gap-1.5 text-[11px] opacity-60"
+            className={`flex items-center gap-2 font-mono text-[10px] text-faint ${compact ? "ml-1" : "ml-2"}`}
             title={`${progress.done} de ${progress.total} itens concluídos`}
           >
-            <span className="h-1 w-10 overflow-hidden rounded-full bg-black/10 dark:bg-white/15">
+            <span
+              className={`h-1 w-12 overflow-hidden rounded-full bg-white/10 ${compact ? "hidden" : ""}`}
+            >
               <span
-                className="block h-full rounded-full bg-green-500 transition-[width]"
+                className={`block h-full rounded-full transition-[width] duration-300 ${
+                  progress.done === progress.total ? "bg-emerald-400" : "accent-gradient"
+                }`}
                 style={{ width: `${(progress.done / progress.total) * 100}%` }}
               />
             </span>
-            {progress.done}/{progress.total}
+            <span className={progress.done === progress.total ? "text-emerald-400" : ""}>
+              {progress.done}/{progress.total}
+            </span>
           </span>
         )}
 
         <div ref={menuRef} className="relative ml-auto">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className={btn}
+            className="icon-btn"
+            aria-label="Mais ações"
             title="Mais ações"
             aria-expanded={menuOpen}
           >
-            {copied ? "✓" : "⋯"}
+            {copied ? (
+              <Check size={15} className="text-emerald-400" />
+            ) : (
+              <MoreHorizontal size={15} />
+            )}
           </button>
           {menuOpen && (
-            <div className="absolute top-full right-0 z-10 mt-1 flex w-48 flex-col rounded-lg border border-black/10 bg-white p-1 text-zinc-900 shadow-lg dark:border-white/10 dark:bg-zinc-800 dark:text-zinc-100">
+            <div className="absolute top-full right-0 z-20 mt-1.5 flex w-52 flex-col rounded-xl border border-line-strong bg-overlay/95 p-1 shadow-2xl shadow-black/50 backdrop-blur-xl">
               <button
                 className={menuItem}
                 onClick={() =>
                   runMenuAction(() => void copyToClipboard(value).then(() => setCopied(true)))
                 }
               >
-                📋 Copiar conteúdo
+                <Copy size={13} className="text-muted" />
+                Copiar conteúdo
               </button>
               {onExport && (
                 <button className={menuItem} onClick={() => runMenuAction(onExport)}>
-                  ⤓ Exportar como .md
+                  <Download size={13} className="text-muted" />
+                  Exportar como .md
                 </button>
               )}
-              <div className="my-1 h-px bg-black/10 dark:bg-white/10" />
+              <div className="mx-1 my-1 h-px bg-line" />
               <button
                 className={menuItem}
                 disabled={disabled || progress.done === 0}
                 onClick={() => runMenuAction(() => onChange(removeCompletedItems(value)))}
               >
-                🧹 Limpar concluídos
+                <Eraser size={13} className="text-muted" />
+                Limpar concluídos
               </button>
               <button
                 className={menuItem}
                 disabled={disabled || progress.done === 0}
                 onClick={() => runMenuAction(() => onChange(moveCompletedToEnd(value)))}
               >
-                ⇣ Concluídos para o fim
+                <ArrowDownToLine size={13} className="text-muted" />
+                Concluídos para o fim
               </button>
             </div>
           )}
         </div>
-        <button
-          onClick={() => setMode(mode === "edit" ? "view" : "edit")}
-          className={btn}
-          title={mode === "edit" ? "Visualizar" : "Editar texto"}
-        >
-          {mode === "edit" ? "👁" : "✎"}
-        </button>
+        {compact ? (
+          <button
+            onClick={() => setMode(mode === "edit" ? "view" : "edit")}
+            className="icon-btn"
+            aria-label={mode === "edit" ? "Visualizar" : "Editar texto"}
+            title={mode === "edit" ? "Visualizar" : "Editar texto"}
+          >
+            {mode === "edit" ? <Eye size={14} /> : <PencilLine size={14} />}
+          </button>
+        ) : (
+          <div className="ml-1 flex rounded-lg border border-line bg-white/[0.02] p-0.5">
+            <button
+              onClick={() => setMode("edit")}
+              className={modeBtn(mode === "edit")}
+              aria-label="Editar texto"
+              title="Editar texto"
+            >
+              <PencilLine size={13} />
+            </button>
+            <button
+              onClick={() => setMode("view")}
+              className={modeBtn(mode === "view")}
+              aria-label="Visualizar"
+              title="Visualizar"
+            >
+              <Eye size={13} />
+            </button>
+          </div>
+        )}
       </div>
 
       {mode === "edit" ? (
@@ -230,11 +292,11 @@ export function NoteBody({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Escreva em markdown..."
+          placeholder="Comece a escrever… (markdown)"
           disabled={disabled}
           autoFocus={autoFocus}
           style={style}
-          className={`resize-none bg-transparent outline-none disabled:opacity-60 ${className}`}
+          className={`resize-none bg-transparent outline-none placeholder:text-faint disabled:opacity-60 ${className}`}
         />
       ) : (
         <div

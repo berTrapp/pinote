@@ -1,5 +1,17 @@
 import { useEffect, useState } from "react";
-import type { MouseEvent } from "react";
+import type { MouseEvent, ReactNode } from "react";
+import {
+  Archive,
+  ArchiveRestore,
+  AlarmClock,
+  ExternalLink,
+  FileX2,
+  Loader2,
+  NotebookPen,
+  RotateCcw,
+  Star,
+  Trash2,
+} from "lucide-react";
 import { useNotesStore } from "../stores/notesStore";
 import { windowsApi } from "../services/windowsApi";
 import type { Note } from "../types";
@@ -11,7 +23,7 @@ function preview(content: string): string {
   const firstLine = content.split("\n").find((line) => line.trim().length > 0);
   if (!firstLine) return "";
   const item = parseChecklistLine(firstLine);
-  const text = item ? `${item.checked ? "☑" : "☐"} ${item.text}` : firstLine;
+  const text = item ? `${item.checked ? "☑" : "☐"} ${item.text}` : firstLine.replace(/^#+ /, "");
   return text.slice(0, 120);
 }
 
@@ -35,22 +47,34 @@ export function NoteList() {
   const allSelected = notes.length > 0 && notes.every((n) => selectedIds.has(n.id));
 
   if (loading && notes.length === 0) {
-    return <div className="p-6 text-center text-sm opacity-40">Carregando...</div>;
+    return (
+      <div className="flex flex-1 items-center justify-center gap-2 text-xs text-faint">
+        <Loader2 size={14} className="animate-spin" />
+        Carregando…
+      </div>
+    );
   }
 
   if (notes.length === 0) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-1 p-6 text-center">
-        <span className="text-2xl opacity-20">🗒</span>
-        <span className="text-sm opacity-50">Nenhuma nota encontrada.</span>
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+        <span className="grid h-12 w-12 place-items-center rounded-xl border border-line bg-white/[0.03]">
+          <NotebookPen size={20} className="text-faint" />
+        </span>
+        <span className="text-sm text-muted">Nenhuma nota por aqui.</span>
       </div>
     );
   }
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-line px-4">
+        <span className="font-mono text-[10px] tracking-[0.14em] text-faint uppercase">
+          {notes.length} {notes.length === 1 ? "nota" : "notas"}
+        </span>
+      </div>
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-2 border-b border-black/10 bg-blue-600/10 px-3 py-1.5 text-xs dark:border-white/10">
+        <div className="flex items-center gap-2 border-b border-accent/20 bg-accent/10 px-4 py-2 text-xs">
           <input
             type="checkbox"
             checked={allSelected}
@@ -60,22 +84,23 @@ export function NoteList() {
             onChange={toggleSelectAll}
             aria-label="Selecionar todas"
             title="Selecionar todas"
-            className="accent-blue-600"
+            className="accent-violet-500"
           />
-          <span className="font-medium">{selectedIds.size} selecionada(s)</span>
+          <span className="font-medium text-fg">{selectedIds.size} selecionada(s)</span>
           <button
             onClick={() => void bulkDeleteSelected()}
-            className="ml-auto font-medium text-red-500 hover:text-red-600"
+            className="ml-auto flex items-center gap-1 font-medium text-red-400 hover:text-red-300"
           >
+            <Trash2 size={13} />
             Excluir
           </button>
-          <button onClick={clearBulkSelection} className="opacity-70 hover:opacity-100">
+          <button onClick={clearBulkSelection} className="text-muted hover:text-fg">
             Cancelar
           </button>
         </div>
       )}
       {statusFilter === "trashed" && <EmptyTrashBar count={notes.length} />}
-      <ul className="flex flex-1 flex-col overflow-y-auto">
+      <ul className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
         {notes.map((note) => (
           <NoteRow
             key={note.id}
@@ -103,8 +128,8 @@ function EmptyTrashBar({ count }: { count: number }) {
   }, [armed]);
 
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-black/10 px-3 py-1.5 text-xs dark:border-white/10">
-      <span className="opacity-60">{count} nota(s) na lixeira</span>
+    <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-2 text-xs">
+      <span className="text-muted">{count} na lixeira</span>
       <button
         onClick={() => {
           if (!armed) {
@@ -114,13 +139,44 @@ function EmptyTrashBar({ count }: { count: number }) {
           setArmed(false);
           void emptyTrash();
         }}
-        className={`rounded-md px-2 py-0.5 font-medium transition-colors ${
-          armed ? "bg-red-600 text-white hover:bg-red-700" : "text-red-500 hover:bg-red-500/10"
+        className={`flex items-center gap-1.5 rounded-md px-2 py-1 font-medium transition-colors ${
+          armed ? "bg-red-500 text-white hover:bg-red-600" : "text-red-400 hover:bg-red-500/10"
         }`}
       >
+        <FileX2 size={13} />
         {armed ? "Confirmar exclusão definitiva" : "Esvaziar lixeira"}
       </button>
     </div>
+  );
+}
+
+function RowAction({
+  label,
+  danger = false,
+  onClick,
+  children,
+}: {
+  label: string;
+  danger?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      onClick={(e: MouseEvent) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      aria-label={label}
+      title={label}
+      className={`grid h-6 w-6 place-items-center rounded-md transition-colors ${
+        danger
+          ? "text-faint hover:bg-red-500/15 hover:text-red-400"
+          : "text-faint hover:bg-white/10 hover:text-fg"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -149,139 +205,146 @@ function NoteRow({
   const priority = priorityInfo(note.priority);
   const progress = checklistProgress(note.content);
 
-  const iconBtn = "opacity-0 transition-opacity group-hover:opacity-100";
-  const iconBtnDanger = "opacity-0 text-red-500 transition-opacity group-hover:opacity-100";
-
-  function stop(e: MouseEvent, action: () => void) {
-    e.stopPropagation();
-    action();
-  }
-
   return (
-    <li className="group flex items-center gap-1 border-b border-black/5 dark:border-white/5">
+    <li
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-current={selected}
+      className={`group relative flex cursor-pointer gap-2.5 overflow-hidden rounded-lg border px-3 py-2.5 outline-none transition-all focus-visible:ring-2 focus-visible:ring-accent/50 ${
+        selected
+          ? "border-accent/40 bg-accent/[0.08] shadow-[0_0_0_1px] shadow-accent/10"
+          : "border-transparent hover:border-line hover:bg-white/[0.03]"
+      }`}
+    >
+      {note.background_color && (
+        <span
+          className="absolute top-2.5 bottom-2.5 left-0 w-[3px] rounded-r"
+          style={{ backgroundColor: note.background_color }}
+        />
+      )}
       <input
         type="checkbox"
         checked={checked}
         onChange={onToggleChecked}
         onClick={(e) => e.stopPropagation()}
         aria-label="Selecionar nota"
-        className="ml-3 shrink-0 accent-blue-600"
-      />
-      <button
-        onClick={onSelect}
-        className={`flex flex-1 flex-col gap-0.5 px-2 py-2.5 text-left transition-colors ${
-          selected ? "bg-blue-600/10" : "hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"
+        className={`mt-0.5 shrink-0 accent-violet-500 transition-opacity ${
+          checked ? "opacity-100" : "opacity-0 group-hover:opacity-100"
         }`}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex min-w-0 items-center gap-1.5">
-            {note.background_color && (
-              <span
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: note.background_color }}
-              />
-            )}
-            {priority.mark && (
-              <span
-                className={`shrink-0 text-xs font-bold ${priority.className}`}
-                title={`Prioridade ${priority.label.toLowerCase()}`}
-              >
-                {priority.mark}
-              </span>
-            )}
-            <span className="truncate text-sm font-medium">{note.title || "Sem título"}</span>
-          </span>
-          <span className="flex shrink-0 items-center gap-1.5 text-xs">
-            {!isTrashed && (
-              <button
-                onClick={(e) => stop(e, () => void windowsApi.openNote(note.id))}
-                aria-label="Abrir como janela flutuante"
-                title="Abrir como janela flutuante"
-                className={iconBtn}
-              >
-                ↗
-              </button>
-            )}
+      />
 
-            {isTrashed ? (
-              <>
-                <button
-                  onClick={(e) => stop(e, () => void restoreNote(note.id))}
-                  aria-label="Restaurar"
-                  title="Restaurar"
-                  className={iconBtn}
-                >
-                  ↺
-                </button>
-                <button
-                  onClick={(e) => stop(e, () => void deleteNotePermanently(note.id))}
-                  aria-label="Excluir permanentemente"
-                  title="Excluir permanentemente"
-                  className={iconBtnDanger}
-                >
-                  ⌫
-                </button>
-              </>
-            ) : (
-              <>
-                {isArchived ? (
-                  <button
-                    onClick={(e) => stop(e, () => void unarchiveNote(note.id))}
-                    aria-label="Desarquivar"
-                    title="Desarquivar"
-                    className={iconBtn}
-                  >
-                    ↺
-                  </button>
-                ) : (
-                  <button
-                    onClick={(e) => stop(e, () => void archiveNote(note.id))}
-                    aria-label="Arquivar"
-                    title="Arquivar"
-                    className={iconBtn}
-                  >
-                    🗄
-                  </button>
-                )}
-                <button
-                  onClick={(e) => stop(e, () => void softDeleteNote(note.id))}
-                  aria-label="Excluir"
-                  title="Excluir"
-                  className={iconBtnDanger}
-                >
-                  🗑
-                </button>
-              </>
-            )}
-
-            <button
-              onClick={(e) => stop(e, () => void toggleFavorite(note.id))}
-              aria-label="Favoritar"
-              title="Favoritar"
-              className={note.favorite ? "text-yellow-500" : "opacity-20 hover:opacity-60"}
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex items-center gap-1.5">
+          {priority.mark && (
+            <span
+              className={`shrink-0 font-mono text-[11px] font-bold ${priority.className}`}
+              title={`Prioridade ${priority.label.toLowerCase()}`}
             >
-              ★
-            </button>
+              {priority.mark}
+            </span>
+          )}
+          <span
+            className={`truncate text-[13px] font-medium ${note.title ? "text-fg" : "text-muted"}`}
+          >
+            {note.title || "Sem título"}
           </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              void toggleFavorite(note.id);
+            }}
+            aria-label="Favoritar"
+            title="Favoritar"
+            className={`ml-auto shrink-0 transition-opacity ${
+              note.favorite ? "" : "opacity-0 group-hover:opacity-100"
+            }`}
+          >
+            <Star
+              size={13}
+              className={
+                note.favorite ? "fill-amber-400 text-amber-400" : "text-faint hover:text-amber-400"
+              }
+            />
+          </button>
         </div>
-        <span className="truncate text-xs opacity-60">{preview(note.content) || "Nota vazia"}</span>
-        <span className="flex items-center gap-2 text-[11px]">
-          <span className="opacity-40">{formatDate(note.updated_at)}</span>
+
+        <span className="truncate text-xs text-muted">{preview(note.content) || "Nota vazia"}</span>
+
+        <div className="flex items-center gap-2.5 font-mono text-[10px] text-faint">
+          <span>{formatDate(note.updated_at)}</span>
           {progress.total > 0 && (
             <span
-              className={progress.done === progress.total ? "text-green-600" : "opacity-50"}
-              title="Itens concluídos"
+              className="flex items-center gap-1.5"
+              title={`${progress.done} de ${progress.total} itens concluídos`}
             >
-              ☑ {progress.done}/{progress.total}
+              <span className="h-1 w-8 overflow-hidden rounded-full bg-white/10">
+                <span
+                  className={`block h-full rounded-full ${
+                    progress.done === progress.total ? "bg-emerald-400" : "accent-gradient"
+                  }`}
+                  style={{ width: `${(progress.done / progress.total) * 100}%` }}
+                />
+              </span>
+              <span className={progress.done === progress.total ? "text-emerald-400" : ""}>
+                {progress.done}/{progress.total}
+              </span>
             </span>
           )}
           {note.remind_at && (
-            <span className="text-blue-600 dark:text-blue-400" title="Lembrete">
-              ⏰ {formatReminder(note.remind_at)}
+            <span className="flex items-center gap-1 text-sky-400" title="Lembrete">
+              <AlarmClock size={11} />
+              {formatReminder(note.remind_at)}
             </span>
           )}
-        </span>
-      </button>
+        </div>
+      </div>
+
+      <div className="absolute right-2 bottom-2 flex items-center gap-0.5 rounded-md border border-line bg-raised/95 p-0.5 opacity-0 shadow-lg backdrop-blur transition-opacity group-hover:opacity-100">
+        {!isTrashed && (
+          <RowAction
+            label="Abrir como janela flutuante"
+            onClick={() => void windowsApi.openNote(note.id)}
+          >
+            <ExternalLink size={13} />
+          </RowAction>
+        )}
+        {isTrashed ? (
+          <>
+            <RowAction label="Restaurar" onClick={() => void restoreNote(note.id)}>
+              <RotateCcw size={13} />
+            </RowAction>
+            <RowAction
+              label="Excluir permanentemente"
+              danger
+              onClick={() => void deleteNotePermanently(note.id)}
+            >
+              <FileX2 size={13} />
+            </RowAction>
+          </>
+        ) : (
+          <>
+            {isArchived ? (
+              <RowAction label="Desarquivar" onClick={() => void unarchiveNote(note.id)}>
+                <ArchiveRestore size={13} />
+              </RowAction>
+            ) : (
+              <RowAction label="Arquivar" onClick={() => void archiveNote(note.id)}>
+                <Archive size={13} />
+              </RowAction>
+            )}
+            <RowAction label="Excluir" danger onClick={() => void softDeleteNote(note.id)}>
+              <Trash2 size={13} />
+            </RowAction>
+          </>
+        )}
+      </div>
     </li>
   );
 }

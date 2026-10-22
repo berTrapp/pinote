@@ -39,7 +39,7 @@ export function ManagerView() {
       <Topbar />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
-        <div className="flex w-80 shrink-0 flex-col overflow-hidden border-r border-black/10 dark:border-white/10">
+        <div className="flex w-80 shrink-0 flex-col overflow-hidden border-r border-line bg-surface/40">
           <NoteList />
         </div>
         <NoteEditor />

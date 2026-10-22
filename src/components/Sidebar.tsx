@@ -1,12 +1,26 @@
+import { Archive, Hash, Inbox, Layers, Star, Trash2, X, type LucideIcon } from "lucide-react";
 import { useNotesStore } from "../stores/notesStore";
 import type { StatusFilter } from "../types";
 
-const STATUS_TABS: { value: StatusFilter; label: string; icon: string }[] = [
-  { value: "active", label: "Ativas", icon: "📝" },
-  { value: "archived", label: "Arquivadas", icon: "🗄" },
-  { value: "trashed", label: "Lixeira", icon: "🗑" },
-  { value: "all", label: "Todas", icon: "📚" },
+const STATUS_TABS: { value: StatusFilter; label: string; icon: LucideIcon }[] = [
+  { value: "active", label: "Ativas", icon: Inbox },
+  { value: "archived", label: "Arquivadas", icon: Archive },
+  { value: "trashed", label: "Lixeira", icon: Trash2 },
+  { value: "all", label: "Todas", icon: Layers },
 ];
+
+function navItemClass(active: boolean) {
+  return `group relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition-colors ${
+    active
+      ? "bg-white/[0.06] font-medium text-fg"
+      : "text-muted hover:bg-white/[0.035] hover:text-fg"
+  }`;
+}
+
+function ActiveMarker({ active }: { active: boolean }) {
+  if (!active) return null;
+  return <span className="accent-gradient absolute top-1.5 bottom-1.5 -left-3 w-[3px] rounded-r" />;
+}
 
 export function Sidebar() {
   const statusFilter = useNotesStore((s) => s.statusFilter);
@@ -18,65 +32,72 @@ export function Sidebar() {
   const setTagFilter = useNotesStore((s) => s.setTagFilter);
 
   return (
-    <aside className="flex w-52 shrink-0 flex-col gap-5 border-r border-black/10 bg-black/[0.015] p-3 dark:border-white/10 dark:bg-white/[0.02]">
+    <aside className="flex w-56 shrink-0 flex-col gap-6 overflow-y-auto border-r border-line px-3 py-4">
       <nav className="flex flex-col gap-0.5">
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => setStatusFilter(tab.value)}
-            className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors ${
-              statusFilter === tab.value
-                ? "bg-blue-600/10 font-medium text-blue-700 dark:text-blue-300"
-                : "hover:bg-black/5 dark:hover:bg-white/10"
-            }`}
-          >
-            <span className="text-xs">{tab.icon}</span>
-            {tab.label}
-          </button>
-        ))}
+        <span className="px-2.5 pb-2 font-mono text-[10px] tracking-[0.14em] text-faint uppercase">
+          Notas
+        </span>
+        {STATUS_TABS.map((tab) => {
+          const active = statusFilter === tab.value;
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.value}
+              onClick={() => setStatusFilter(tab.value)}
+              className={navItemClass(active)}
+            >
+              <ActiveMarker active={active} />
+              <Icon size={15} className={active ? "text-accent" : ""} />
+              {tab.label}
+            </button>
+          );
+        })}
         <button
           onClick={() => setFavoriteOnly(!favoriteOnly)}
-          className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors ${
-            favoriteOnly
-              ? "bg-blue-600/10 font-medium text-blue-700 dark:text-blue-300"
-              : "hover:bg-black/5 dark:hover:bg-white/10"
-          }`}
+          className={navItemClass(favoriteOnly)}
         >
-          <span className="text-xs text-yellow-500">★</span>
+          <ActiveMarker active={favoriteOnly} />
+          <Star
+            size={15}
+            className={favoriteOnly ? "fill-amber-400 text-amber-400" : "text-amber-400/70"}
+          />
           Favoritas
         </button>
       </nav>
 
       {tags.length > 0 && (
         <div className="flex flex-col gap-0.5">
-          <span className="px-2.5 pb-1 text-xs font-medium tracking-wide uppercase opacity-40">
-            Tags
-          </span>
-          <button
-            onClick={() => setTagFilter(null)}
-            className={`rounded-lg px-2.5 py-1 text-left text-sm transition-colors ${
-              tagFilter === null
-                ? "font-medium text-blue-700 dark:text-blue-300"
-                : "opacity-70 hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10"
-            }`}
-          >
-            Todas as tags
-          </button>
+          <div className="flex items-center justify-between px-2.5 pb-2">
+            <span className="font-mono text-[10px] tracking-[0.14em] text-faint uppercase">
+              Tags
+            </span>
+            {tagFilter !== null && (
+              <button
+                onClick={() => setTagFilter(null)}
+                className="flex items-center gap-1 text-[11px] text-muted hover:text-fg"
+              >
+                <X size={11} />
+                limpar
+              </button>
+            )}
+          </div>
           {tags.map((tag) => (
             <button
               key={tag.id}
               onClick={() => setTagFilter(tag.id)}
-              className={`truncate rounded-lg px-2.5 py-1 text-left text-sm transition-colors ${
-                tagFilter === tag.id
-                  ? "font-medium text-blue-700 dark:text-blue-300"
-                  : "opacity-70 hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10"
-              }`}
+              className={navItemClass(tagFilter === tag.id)}
             >
-              #{tag.name}
+              <ActiveMarker active={tagFilter === tag.id} />
+              <Hash size={14} className={tagFilter === tag.id ? "text-accent" : ""} />
+              <span className="truncate">{tag.name}</span>
             </button>
           ))}
         </div>
       )}
+
+      <div className="mt-auto rounded-lg border border-line bg-white/[0.02] p-3 text-[11px] leading-relaxed text-faint">
+        <span className="kbd mr-1">Ctrl Alt N</span> cria uma nota flutuante de qualquer lugar.
+      </div>
     </aside>
   );
 }

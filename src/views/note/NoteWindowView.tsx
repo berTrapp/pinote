@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { AArrowDown, AArrowUp, Blend, Loader2, Pin, PinOff } from "lucide-react";
 import { notesApi } from "../../services/notesApi";
 import { NoteBody } from "../../components/NoteBody";
 import type { Note, NoteDeletedEvent, NoteUpdatedEvent } from "../../types";
@@ -121,8 +122,9 @@ export function NoteWindowView({ noteId }: { noteId: string }) {
 
   if (!note) {
     return (
-      <div className="flex h-screen items-center justify-center text-sm opacity-40">
-        Carregando...
+      <div className="flex h-screen items-center justify-center gap-2 bg-surface text-xs text-faint">
+        <Loader2 size={14} className="animate-spin" />
+        Carregando…
       </div>
     );
   }
@@ -130,59 +132,77 @@ export function NoteWindowView({ noteId }: { noteId: string }) {
   const fontSize = note.font_size ?? DEFAULT_FONT_SIZE;
   const nextOpacity =
     OPACITY_STEPS[(OPACITY_STEPS.indexOf(note.opacity) + 1) % OPACITY_STEPS.length] ?? 1;
-  const baseBackground = note.background_color ?? "var(--app-bg)";
-
-  const iconBtn =
-    "flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1 text-xs opacity-60 transition-colors hover:bg-black/5 hover:opacity-100 disabled:opacity-25 dark:hover:bg-white/10";
+  // dark glass, lightly tinted with the note's color when it has one
+  const surface = note.background_color
+    ? `color-mix(in srgb, ${note.background_color} 13%, var(--color-surface))`
+    : "var(--color-surface)";
 
   return (
     <div
-      className="flex h-screen flex-col"
+      className="relative flex h-screen flex-col text-fg"
       style={{
-        backgroundColor: `color-mix(in srgb, ${baseBackground} ${Math.round(note.opacity * 100)}%, transparent)`,
-        color: note.background_color ? "#18181b" : undefined,
+        backgroundColor: `color-mix(in srgb, ${surface} ${Math.round(note.opacity * 100)}%, transparent)`,
       }}
     >
-      <div className="flex items-center gap-0.5 border-b border-black/10 pr-1 dark:border-white/10">
+      <span
+        className="absolute inset-x-0 top-0 h-[2px]"
+        style={
+          note.background_color
+            ? {
+                backgroundColor: note.background_color,
+                boxShadow: `0 0 14px ${note.background_color}`,
+              }
+            : {
+                backgroundImage:
+                  "linear-gradient(90deg, var(--color-accent), var(--color-accent-2))",
+              }
+        }
+      />
+      <div className="flex shrink-0 items-center gap-0.5 border-b border-line pt-0.5 pr-1.5">
         <input
           value={title}
           onChange={(e) => {
             setTitle(e.target.value);
             scheduleSave(e.target.value, content);
           }}
-          placeholder="Título (opcional)"
-          className="min-w-0 flex-1 bg-transparent px-3 py-2 text-base font-medium outline-none"
+          placeholder="Sem título"
+          className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[15px] font-semibold tracking-tight outline-none placeholder:text-faint"
         />
         <button
           onClick={() => void toggleAlwaysOnTop()}
-          className={`${iconBtn} ${note.always_on_top ? "opacity-100" : "grayscale"}`}
+          className={`icon-btn ${note.always_on_top ? "text-violet-300" : ""}`}
+          aria-label={note.always_on_top ? "Desafixar do topo" : "Fixar sempre no topo"}
           title={note.always_on_top ? "Desafixar do topo" : "Fixar sempre no topo"}
           aria-pressed={note.always_on_top}
         >
-          📌
+          {note.always_on_top ? <Pin size={14} className="fill-current" /> : <PinOff size={14} />}
         </button>
         <button
           onClick={() => void updateAppearance(note.opacity, fontSize - 1)}
           disabled={fontSize <= MIN_FONT_SIZE}
-          className={iconBtn}
+          className="icon-btn"
+          aria-label="Diminuir fonte"
           title="Diminuir fonte"
         >
-          A−
+          <AArrowDown size={15} />
         </button>
         <button
           onClick={() => void updateAppearance(note.opacity, fontSize + 1)}
           disabled={fontSize >= MAX_FONT_SIZE}
-          className={iconBtn}
+          className="icon-btn"
+          aria-label="Aumentar fonte"
           title="Aumentar fonte"
         >
-          A+
+          <AArrowUp size={15} />
         </button>
         <button
           onClick={() => void updateAppearance(nextOpacity, note.font_size)}
-          className={iconBtn}
+          className="icon-btn font-mono text-[10px]"
+          aria-label="Opacidade"
           title={`Opacidade: ${Math.round(note.opacity * 100)}% (clique para ${Math.round(nextOpacity * 100)}%)`}
         >
-          ◐
+          <Blend size={14} />
+          {note.opacity < 1 && `${Math.round(note.opacity * 100)}`}
         </button>
       </div>
 
@@ -194,9 +214,10 @@ export function NoteWindowView({ noteId }: { noteId: string }) {
         }}
         onExport={() => void flushSave().then(() => notesApi.exportMarkdown(noteId))}
         autoFocus
+        compact
         style={{ fontSize }}
-        toolbarClassName="px-2 pt-1"
-        className="flex-1 px-3 py-2 leading-relaxed"
+        toolbarClassName="border-b border-line px-1.5 py-1"
+        className="flex-1 px-3 py-2.5 leading-relaxed text-fg/90"
       />
     </div>
   );
